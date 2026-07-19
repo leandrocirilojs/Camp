@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoBell - Campainha Inteligente</title>
+    
+    <!-- Biblioteca gratuita para leitura de QR Code -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary: #4ade80; /* Verde permissão */
+            --danger: #f87171; /* Vermelho erro */
+            --text-main: #ffffff;
+            --text-sec: #a1a1aa;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+            background-color: var(--surface-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        h1 { margin: 0; font-size: 24px; color: var(--primary); }
+        p.subtitle { margin: 5px 0 0; font-size: 14px; color: var(--text-sec); }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Container da Câmera */
+        #reader {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid var(--surface-color);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.5);
+        }
+
+        /* Painel de Status */
+        #status-panel {
+            margin-top: 30px;
+            text-align: center;
+            width: 100%;
+        }
+
+        #status-message {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: var(--surface-color);
+        }
+
+        /* Botão de Ação (Escondido por padrão) */
+        #action-btn {
+            display: none;
+            width: 100%;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #121212;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(74, 222, 128, 0.4);
+            transition: transform 0.2s;
+        }
+
+        #action-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>GeoBell 🔔</h1>
+        <p class="subtitle">Aproxime-se da porta e escaneie o QR Code</p>
+    </header>
+
+    <main>
+        <!-- A câmera renderiza aqui dentro -->
+        <div id="reader"></div>
+
+        <div id="status-panel">
+            <div id="status-message">Aguardando leitura do QR Code...</div>
+            <button id="action-btn">Tocar Campainha</button>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // 🛠️ CONFIGURAÇÕES DO MORADOR - ALTERE AQUI
+        // ==========================================
+        // Dica: Abra o Google Maps no celular estando na sua porta para pegar essas coordenadas.
+        const CASA_LAT = -24.0932; // Exemplo de Latitude (Troque pela sua)
+        const CASA_LNG = -46.6213; // Exemplo de Longitude (Troque pela sua)
+        const MARGEM_METROS = 20;  // Quantos metros de distância são permitidos?
+        const WHATSAPP_NUMERO = "5511999999999"; // Seu número (Código país + DDD + Número)
+        // ==========================================
+
+        const statusMsg = document.getElementById('status-message');
+        const actionBtn = document.getElementById('action-btn');
+        let html5QrCode;
+
+        // Iniciar Câmera
+        function iniciarScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+            // Pede a câmera traseira (environment)
+            html5QrCode.start({ facingMode: "environment" }, config, aoEscanearComSucesso)
+            .catch(err => {
+                statusMsg.innerText = "Câmera bloqueada. Dê permissão no navegador.";
+                statusMsg.style.color = "var(--danger)";
+            });
+        }
+
+        // Quando o QR Code é lido com sucesso
+        function aoEscanearComSucesso(textoDecodificado) {
+            // Para a câmera e esconde a tela de vídeo
+            html5QrCode.stop();
+            document.getElementById('reader').style.display = 'none';
+            
+            // Inicia a verificação de GPS
+            verificarLocalizacao();
+        }
+
+        // Verifica a localização via GPS do navegador
+        function verificarLocalizacao() {
+            statusMsg.innerText = "Verificando sua localização GPS... 📡";
+            statusMsg.style.color = "var(--text-main)";
+
+            if ("geolocation" in navigator) {
+                // Solicita alta precisão
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+
+                        // Calcula a distância usando a fórmula de Haversine
+                        const distancia = calcularDistancia(CASA_LAT, CASA_LNG, userLat, userLng);
+
+                        if (distancia <= MARGEM_METROS) {
+                            // SUCESSO!
+                            statusMsg.innerHTML = `📍 Localização confirmada!<br><span style="font-size: 14px; font-weight: normal;">Distância: ${Math.round(distancia)}m</span>`;
+                            statusMsg.style.color = "var(--primary)";
+                            
+                            // Mostra o botão do WhatsApp
+                            actionBtn.style.display = "block";
+                            actionBtn.onclick = () => {
+                                window.location.href = `https://wa.me/${WHATSAPP_NUMERO}?text=Olá! Estou aqui na sua porta. 🔔`;
+                            };
+                        } else {
+                            // FALHA (Fora do raio)
+                            statusMsg.innerHTML = `❌ Acesso Negado.<br><span style="font-size: 14px; font-weight: normal;">Você está a ${Math.round(distancia)} metros da casa. Aproxime-se.</span>`;
+                            statusMsg.style.color = "var(--danger)";
+                        }
+                    },
+                    (error) => {
+                        statusMsg.innerText = "Erro ao obter GPS. Ative a localização no seu celular.";
+                        statusMsg.style.color = "var(--danger)";
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                statusMsg.innerText = "Seu navegador não suporta geolocalização.";
+            }
+        }
+
+        // Fórmula de Haversine (Calcula distância em metros entre duas coordenadas)
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Raio da terra em metros
+            const rad = Math.PI / 180;
+            const difLat = (lat2 - lat1) * rad;
+            const difLon = (lon2 - lon1) * rad;
+
+            const a = Math.sin(difLat/2) * Math.sin(difLat/2) +
+                      Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
+                      Math.sin(difLon/2) * Math.sin(difLon/2);
+            
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; 
+        }
+
+        // Inicia o app assim que a página carregar
+        window.onload = iniciarScanner;
+
+    </script>
+</body>
+</html>
