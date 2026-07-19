@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoBell - Gerador de QR Code</title>
+    <!-- Biblioteca para gerar o QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f4f5;
+            color: #18181b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        input {
+            width: 90%;
+            padding: 10px;
+            margin: 15px 0;
+            border: 1px solid #d4d4d8;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4ade80;
+            color: #121212;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover { background-color: #22c55e; }
+        #qrcode {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Criar QR Code da Porta 🚪</h2>
+        <p style="font-size: 14px; color: #71717a;">
+            Cole aqui o link do seu site GeoBell depois de publicado:
+        </p>
+        
+        <!-- Campo para digitar o link do site hospedado -->
+        <input type="url" id="siteUrl" placeholder="Ex: https://meugeobell.vercel.app" required>
+        
+        <button onclick="gerarQRCode()">Gerar QR Code</button>
+
+        <!-- Onde o QR Code vai aparecer -->
+        <div id="qrcode"></div>
+    </div>
+
+    <script>
+        function gerarQRCode() {
+            const url = document.getElementById('siteUrl').value;
+            const container = document.getElementById('qrcode');
+            
+            // Limpa o QR Code anterior, se houver
+            container.innerHTML = "";
+
+            if (!url) {
+                alert("Por favor, digite o link do seu site.");
+                return;
+            }
+
+            // Gera o novo QR Code
+            new QRCode(container, {
+                text: url,
+                width: 200,
+                height: 200,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+    </script>
+</body>
+</html>
